@@ -8,8 +8,8 @@ main:
   SBI DDRD, 4
   SBI DDRD, 5
   CBI DDRD, 6
-  SBI PORTD, 6
-  CBI DDRD, 7
+  SBI PORTD, 6          ;pin PD6 as input pull-up for button
+  CBI DDRD, 7           ;pin PD7 as digital i/p from LDR sensor module
   SBI   DDRB, 1         ;pin PB1 as o/p (Trigger)
   CBI   DDRB, 0         ;pin PB0 as i/p (Echo)
   RCALL init_serial
@@ -45,12 +45,13 @@ init_serial:
 mesin_nyala:
   SBIC PIND, 7
   BREQ siang
-  RCALL malam
+  RCALL malam 
   RET
 
+; mode nyala:
 siang:
-  CBI PORTD, 5
-  CBI PORTD, 2
+  CBI PORTD, 5  ; keadaan default lampu hijau pertama (mati)
+  CBI PORTD, 2  ; keadaan default lampu hijau kedua (mati)
   LDI R30, lo8(message_siang) ; Me-load low-byte dari pesan yang diinginkan ke Z
   LDI R31, hi8(message_siang) ; Me-load high-byte dari pesan yang diinginkan ke Z
   RCALL agn
@@ -62,29 +63,34 @@ malam:
   CBI   PORTB, 1        ;send 10us high pulse to sensor
   RCALL echo_PW         ;compute Echo pulse width count
   RCALL byte2decimal    ;covert & display on serial
-  CPI R27, 1
-  BRSH terang
+
+  ; branching berdasarkan kondisi register R27 yang menyimpan data echo pulse
+  ; jika nilai echo pulse lebih dari atau sama dengan 1, maka subrutin "terang" akan di-call
+  ; jika di luar case yang disebutkan, maka subrutin "redup" akan di-call 
+  CPI R27, 1            
+  BRSH terang           
   CPI R27, 0
   BREQ redup
   RET
 
+;mode nyala (bedasarkan intensitas cahaya)
 terang:
-  SBI PORTD, 5
-  SBI PORTD, 2
+  SBI PORTD, 5  ; menyalakan lampu pertama
+  SBI PORTD, 2  ; menyalakan lampu kedua
   LDI R30, lo8(message_terang) ; Me-load low-byte dari pesan yang diinginkan ke Z
   LDI R31, hi8(message_terang) ; Me-load high-byte dari pesan yang diinginkan ke Z
   RCALL agn
   RET
 redup:
-  SBI PORTD, 5
-  CBI PORTD, 2
+  SBI PORTD, 5  ; menyalakan lampu pertama
+  CBI PORTD, 2  ; mematikan lampu kedua
   LDI R30, lo8(message_redup) ; Me-load low-byte dari pesan yang diinginkan ke Z
   LDI R31, hi8(message_redup) ; Me-load high-byte dari pesan yang diinginkan ke Z
   RCALL agn
   RET
 mati:
-  CBI PORTD, 5
-  CBI PORTD, 2
+  CBI PORTD, 5  ; mematikan lampu pertama
+  CBI PORTD, 2  ; mematikan lampu kedua
   LDI R30, lo8(message_mesin) ; Me-load low-byte dari pesan yang diinginkan ke Z
   LDI R31, hi8(message_mesin) ; Me-load high-byte dari pesan yang diinginkan ke Z
   RCALL agn
@@ -148,7 +154,7 @@ byte2decimal:
       CLR   R27             ;set counter2, initial value 0
       ;--------------------------------------------------------
 l70:  CPI   R28, 100        ;compare R28 with 100
-Ret:  BRMI  l80             ;jump when R28 < 100
+RET:  BRMI  l80             ;jump when R28 < 100
       INC   R26             ;increment counter1 by 1
       SUBI  R28, 100        ;R28 = R28 - 100
       RJMP  l70
